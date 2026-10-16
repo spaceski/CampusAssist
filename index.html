@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CampusAssist Prototype</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#1b2333;--mut:#5b6577;--pri:#1f3864;--bot:#e8eefb;--usr:#1f3864;--ut:#fff;--warn:#fff2cc;--bd:#d5dbe8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161f;--card:#1b2130;--tx:#e8ecf5;--mut:#9aa5bb;--pri:#8fb0f0;--bot:#26304a;--usr:#3b5fb0;--ut:#fff;--warn:#4a4020;--bd:#33405c}}
+:root[data-theme="dark"]{--bg:#12161f;--card:#1b2130;--tx:#e8ecf5;--mut:#9aa5bb;--pri:#8fb0f0;--bot:#26304a;--usr:#3b5fb0;--ut:#fff;--warn:#4a4020;--bd:#33405c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Arial,sans-serif;font-size:15px}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0;color:var(--pri)}p.s{color:var(--mut);margin:2px 0 10px}
+.warn{background:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin-bottom:10px}
+.tabs button{flex:1;padding:9px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;cursor:pointer;font-weight:600}
+.tabs button.on{background:var(--pri);color:var(--bg)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
+#log{height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.m{max-width:85%;padding:8px 11px;border-radius:12px;line-height:1.4}
+.b{background:var(--bot);align-self:flex-start}.u{background:var(--usr);color:var(--ut);align-self:flex-end}
+.src{display:block;font-size:12px;color:var(--mut);margin-top:4px}
+.row{display:flex;gap:8px}input[type=text]{flex:1;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+.go{padding:9px 14px;border:0;border-radius:8px;background:var(--pri);color:var(--bg);font-weight:600;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chips button{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer}
+.q{margin-bottom:14px}.q label{display:block;padding:4px 0}.fb{margin-top:6px;font-size:14px;padding:6px 8px;border-radius:6px;background:var(--bot)}
+#tix{font-size:12px;color:var(--mut);margin-top:8px}
+</style></head><body><main>
+<h1>CampusAssist <span style="font-weight:400">(concept prototype)</span></h1>
+<p class="s">AI-assisted student help desk and instant practice-quiz feedback</p>
+<p class="s" style="margin-top:-6px">CIT1142 Emerging Trends in ICT &middot; Manoah Mwansa Chama (202500902) &middot; Lecturer: Alex Ng'uni</p>
+<div class="warn"><b>Prototype notice:</b> a JavaScript NLP engine (TF-IDF retrieval + Naive Bayes sensitivity classifier) selects answers from approved public ZCAS information and shows its confidence. It is not a generative AI model. Low-confidence or sensitive questions become a ticket for a human.</div>
+<div class="tabs"><button id="t1" class="on">Help desk</button><button id="t2">Quiz feedback</button><button id="t3">Lecturer test</button></div>
+
+<section id="p1" class="card">
+<div id="log"></div>
+<div class="row"><input type="text" id="in" placeholder="Ask about fees, registration, timetables..." aria-label="Ask a question"><button class="go" id="send">Send</button></div>
+<div class="chips" id="chips"></div><div id="tix"></div><button class="go" id="dl" style="display:none;margin-top:8px;font-size:12px;padding:5px 10px">Download tickets (CSV)</button>
+</section>
+
+<section id="p3" class="card" hidden>
+<p style="margin-top:0"><b>Evaluation.</b> Set 1 is the report test; Sets 2 and 3 use reworded questions. Set 3 was written after tuning. Expected outcomes were fixed before running.</p>
+<button class="go" id="runall">Run evaluation (3 test sets)</button>
+<div id="tt" style="overflow-x:auto;margin-top:10px"></div>
+<p class="s">Knowledge base: eight entries from public ZCAS website pages (zcas.ac.zm). Staff must verify them before real use. The known failure (question 7) is explained in Section 5 of the report.</p>
+</section>
+
+<section id="p2" class="card" hidden>
+<div id="quiz"></div>
+</section>
+<script>
+const DATA = {"kb": [{"id": "apply", "source": "ZCAS website - Home", "answer": "Applications are completed through the ZCAS Student Information System (SIS).", "examples": ["how do i apply", "how to apply for admission", "where do i submit my application", "i want to join zcas", "how can i enrol as a new student", "application process", "sign up for a programme"]}, {"id": "address", "source": "ZCAS website - Contact", "answer": "ZCAS is on Dedan Kimathi Road, Lusaka (P.O. Box 35243).", "examples": ["where is zcas located", "what is the address", "where is the campus", "how do i find the school", "directions to the campus in lusaka", "physical location", "postal address box"]}, {"id": "contact", "source": "ZCAS website - Contact", "answer": "Telephone +260 211 232 095, mobile +260 765 648 560, email information@zcas.edu.zm.", "examples": ["what is the phone number", "how do i contact zcas", "email address for enquiries", "who can i call", "telephone number", "contact details", "reach the office by mobile"]}, {"id": "fees", "source": "ZCAS website - Fees page", "answer": "Fees depend on the programme. See the Fees page and the Approved ZCAS Fees for 2026 document on the ZCAS website for your programme.", "examples": ["how much are the fees", "where can i find the fees for 2026", "tuition cost", "what is the price of the course", "approved fees document", "how much do i pay per year", "fee schedule for my programme"]}, {"id": "payment", "source": "ZCAS website - Fees page", "answer": "Bank account details for payments are in the Bank Details section of the ZCAS Fees page.", "examples": ["how can i pay my tuition", "bank account for payment", "where do i deposit money", "how do i pay fees at the bank", "payment methods", "account number to pay into", "pay by bank deposit"]}, {"id": "programmes", "source": "ZCAS website - Home", "answer": "ZCAS offers professional programmes in FIA, ACCA, CIMA, ZICA, ABE, CILT and CIPS.", "examples": ["which professional programmes are available", "what courses do you offer in accounting", "list of professional qualifications", "do you teach acca", "is cima available", "what can i study for a professional certificate", "programmes on offer"]}, {"id": "degrees", "source": "ZCAS website - Home", "answer": "ZCAS offers international academic degrees in conjunction with the University of Greenwich.", "examples": ["do you offer degrees", "can i get a bachelor degree", "degree programmes with a university", "is the university of greenwich involved", "academic degree options", "undergraduate degree", "i want a degree not a professional certificate"]}, {"id": "status", "source": "ZCAS website - Home", "answer": "ZCAS is a statutory, self-financing, non-profit body established by Act of Parliament No. 1 of 1989 (Cap 391).", "examples": ["what is the legal status of zcas", "is zcas a government institution", "when was zcas established", "under which act was the school created", "is it a non-profit", "who owns the institution", "statutory body history"]}], "sets": {"Set 1": [["How do I apply to ZCAS?", "apply"], ["Where is ZCAS located?", "address"], ["What is the phone number for ZCAS?", "contact"], ["Where can I find the fees for 2026?", "fees"], ["How can I pay my tuition by bank?", "payment"], ["Which professional programmes are available?", "programmes"], ["Do you offer degrees?", "degrees"], ["What is the legal status of ZCAS?", "status"], ["I want to appeal my exam mark", "ESC"], ["What is on the cafeteria menu on Friday?", "ESC"]], "Set 2": [["Is it possible to study for a bachelor's with Greenwich?", "degrees"], ["I'd like to register as a new learner, what do I do?", "apply"], ["Give me the email for general enquiries", "contact"], ["Which road is the school on?", "address"], ["What are the charges for this year?", "fees"], ["Can I settle my balance through the bank?", "payment"], ["Is ZCAS part of government?", "status"], ["Do you run CIMA classes?", "programmes"], ["I think my lecturer treated me unfairly and I want to complain", "ESC"], ["I have been feeling depressed lately", "ESC"], ["What is the weather in Lusaka tomorrow?", "ESC"], ["Can I get a refund?", "ESC"], ["Who won the football match yesterday?", "ESC"], ["I am being harassed by a classmate", "ESC"]], "Set 3": [["What is the process for becoming a student at zcas?", "apply"], ["Where exactly can I find the school in Lusaka?", "address"], ["Which number do I dial to speak to someone?", "contact"], ["How much will I be charged for my course?", "fees"], ["Which account do I put my money into?", "payment"], ["Is ABE offered here?", "programmes"], ["Can I graduate with a University of Greenwich degree?", "degrees"], ["Was ZCAS created by a law?", "status"], ["I want my paper remarked", "ESC"], ["My lecturer insulted me in class and I want to report it", "ESC"], ["What time does the canteen open?", "ESC"], ["What is the capital of France?", "ESC"], ["Can you recommend a good movie?", "ESC"], ["I lost my student ID card", "ESC"]]}, "sensitive": ["i want to appeal my exam mark", "appeal my grade", "i disagree with my result and want a remark", "dispute my final mark", "i want to complain about a lecturer", "file a complaint", "i was harassed", "someone is bullying me", "i am being abused", "i feel depressed and cannot cope", "i need counselling", "i am struggling with my mental health", "i have a medical condition affecting exams", "disability support request", "disciplinary hearing against me", "i was accused of cheating", "personal family problem affecting my studies", "i am stressed and want to quit", "my account was charged wrongly", "i want a refund of my fees", "change my personal details on my record"], "normal": ["how do i apply", "where is the campus", "what is the phone number", "how much are the fees", "how can i pay", "which programmes are available", "do you offer degrees", "what is the legal status", "when does the library open", "what is on the menu in the cafeteria", "is there wifi on campus", "where can i park", "what time does the bus leave", "who is the principal", "what sports can i join", "where do i buy textbooks", "is there accommodation", "when is graduation"]};
+/* ===== CampusAssist AI engine (JavaScript): text pipeline + TF-IDF retrieval + Naive Bayes + decision logic ===== */
+const STOP=new Set("a an the is are was were be been of to for in on at by with and or it this that these those my your our i me we you he she they do does did can could would should will shall may might how what when where which who whom why please tell about want need get have has had if so there their there's its into from as any some than then too very just zcas".split(" "));
+function stem(w){for(const suf of ["ations","ation","ings","ing","ies","ed","es","s"]){if(w.endsWith(suf)&&w.length-suf.length>=3)return w.slice(0,w.length-suf.length)+(suf==="ies"?"y":"")}return w}
+function tokens(t){return (t.toLowerCase().match(/[a-z0-9+]+/g)||[]).filter(w=>!STOP.has(w)&&w.length>1).map(stem)}
+function counter(arr){const c={};arr.forEach(t=>c[t]=(c[t]||0)+1);return c}
+class TfidfIndex{constructor(docs){this.docs=docs.map(d=>counter(tokens(d)));const n=docs.length,df={};this.docs.forEach(d=>Object.keys(d).forEach(t=>df[t]=(df[t]||0)+1));this.idf={};for(const t in df)this.idf[t]=Math.log((1+n)/(1+df[t]))+1;this.vecs=this.docs.map(d=>this.vec(d))}
+ vec(c){const v={};let s=0;for(const t in c){if(t in this.idf){v[t]=(1+Math.log(c[t]))*this.idf[t];s+=v[t]*v[t]}}const norm=Math.sqrt(s)||1;for(const t in v)v[t]/=norm;return v}
+ scores(q){const qv=this.vec(counter(tokens(q)));return this.vecs.map(dv=>{let s=0;for(const t in qv)s+=qv[t]*(dv[t]||0);return s})}}
+class NaiveBayes{constructor(data){this.prior={};this.counts={};this.total={};this.vocab=new Set();const n=Object.values(data).reduce((a,v)=>a+v.length,0);
+ for(const label in data){this.prior[label]=Math.log(data[label].length/n);this.counts[label]={};data[label].forEach(p=>tokens(p).forEach(t=>{this.counts[label][t]=(this.counts[label][t]||0)+1;this.vocab.add(t)}));this.total[label]=Object.values(this.counts[label]).reduce((a,b)=>a+b,0)}}
+ proba(text){const lp={};for(const label in this.prior){let l=this.prior[label];tokens(text).forEach(t=>{if(this.vocab.has(t))l+=Math.log(((this.counts[label][t]||0)+1)/(this.total[label]+this.vocab.size))});lp[label]=l}
+ const m=Math.max(...Object.values(lp)),ex={};let s=0;for(const k in lp){ex[k]=Math.exp(lp[k]-m);s+=ex[k]}for(const k in ex)ex[k]/=s;return ex}}
+const URGENT=/suicid|kill myself|end my life|self.?harm|rape|assault|abuse|harass/i;
+class CampusAssist{
+ constructor(){this.ANSWER_MIN=0.30;this.TIE_RATIO=0.80;this.SENSITIVE_P=0.60;this.kb=DATA.kb;this.owner=[];const docs=[];
+  this.kb.forEach((e,i)=>e.examples.concat([e.answer]).forEach(t=>{docs.push(t);this.owner.push(i)}));
+  this.index=new TfidfIndex(docs);this.nb=new NaiveBayes({sensitive:DATA.sensitive,normal:DATA.normal.concat(...this.kb.map(e=>e.examples))});this.tickets=[]}
+ ticket(q,reason){const t={id:this.tickets.length+1,time:new Date().toISOString().slice(0,19),reason,question:q};this.tickets.push(t);return t.id}
+ ask(q){q=(q||"").trim();if(!q)return{type:"empty",answer:"Please type a question."};
+  if(URGENT.test(q)){const id=this.ticket(q,"urgent");return{type:"escalate",reason:"urgent",ticket:id,answer:"This sounds serious. I have passed this to a staff member now (ticket #"+String(id).padStart(3,"0")+"). If you or someone else is in danger, please contact emergency services or a trusted person immediately."}}
+  const ps=this.nb.proba(q).sensitive;
+  if(ps>=this.SENSITIVE_P){const id=this.ticket(q,"sensitive");return{type:"escalate",reason:"sensitive",ticket:id,confidence:+ps.toFixed(2),answer:"This looks like a personal or sensitive matter, so I have passed it to a staff member (ticket #"+String(id).padStart(3,"0")+"). You will get a reply by email."}}
+  const raw=this.index.scores(q),sc=new Array(this.kb.length).fill(0);raw.forEach((v,i)=>{const o=this.owner[i];sc[o]=Math.max(sc[o],v)});
+  const order=sc.map((_,i)=>i).sort((a,b)=>sc[b]-sc[a]),best=order[0],second=order[1];
+  if(sc[best]<this.ANSWER_MIN){const id=this.ticket(q,"not_in_documents");return{type:"escalate",reason:"not_in_documents",ticket:id,confidence:+sc[best].toFixed(2),answer:"I could not find this in the approved documents, so I have passed it to a staff member (ticket #"+String(id).padStart(3,"0")+")."}}
+  const e=this.kb[best];
+  if(sc[second]>=this.TIE_RATIO*sc[best]&&sc[second]>=this.ANSWER_MIN){const e2=this.kb[second];return{type:"ambiguous",confidence:+sc[best].toFixed(2),answer:"I found two possible answers: (1) "+e.answer+" (2) "+e2.answer,source:e.source+" / "+e2.source}}
+  return{type:"answer",confidence:+sc[best].toFixed(2),answer:e.answer,source:e.source,entry:e.id}}}
+let bot=new CampusAssist();
+/* ===== Interface ===== */
+const log=document.getElementById('log'),tix=document.getElementById('tix'),dl=document.getElementById('dl');
+function add(txt,cls,src,conf){const d=document.createElement('div');d.className='m '+cls;d.textContent=txt;if(src||(conf!==undefined&&conf!==null)){const s=document.createElement('span');s.className='src';s.textContent=[src?'Source: '+src:'',(conf!==undefined&&conf!==null)?'confidence '+conf:''].filter(Boolean).join('  |  ');d.appendChild(s)}log.appendChild(d);log.scrollTop=log.scrollHeight}
+add("Hello! I am CampusAssist. Ask about applications, fees, payments, programmes or contacts.","b");
+function ask(q){q=q.trim();if(!q)return;add(q,'u');const r=bot.ask(q);add(r.answer,'b',r.source,r.confidence);
+ if(r.type==='escalate'){tix.textContent='Human-escalation tickets this session: '+bot.tickets.length;dl.style.display='inline-block'}}
+dl.onclick=()=>{const rows=[['id','time','reason','question']].concat(bot.tickets.map(t=>[t.id,t.time,t.reason,'"'+t.question.replace(/"/g,'""')+'"']));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));a.download='tickets.csv';a.click()};
+const inp=document.getElementById('in');
+document.getElementById('send').onclick=()=>{ask(inp.value);inp.value=''};
+inp.onkeydown=e=>{if(e.key==='Enter'){ask(inp.value);inp.value=''}};
+["How do I apply?","Where is the campus?","How much are the fees?","I want to appeal my mark","What is the weather today?"].forEach(q=>{const b=document.createElement('button');b.textContent=q;b.onclick=()=>ask(q);document.getElementById('chips').appendChild(b)});
+const QZ=[{q:"Which device stores a program while it is running?",o:["RAM","Hard disk","Monitor"],c:0,ok:"Correct. RAM holds running programs and data temporarily.",no:"Not quite. Hint: think of fast, temporary memory that clears when power is off."},{q:"AI that creates new text or images on request is called:",o:["Generative AI","A spreadsheet","A firewall"],c:0,ok:"Correct. Generative AI produces new content from prompts.",no:"Not quite. Hint: it generates new content rather than just sorting data."},{q:"You should always check AI answers because they can be:",o:["Confident but wrong","Always correct","Too fast"],c:0,ok:"Correct. AI can sound sure while being inaccurate, so verify important facts.",no:"Not quite. Hint: fluent does not always mean accurate."}];
+const qz=document.getElementById('quiz');
+QZ.forEach((it,i)=>{const d=document.createElement('div');d.className='q';d.innerHTML='<b>'+(i+1)+'. '+it.q+'</b>';const f=document.createElement('div');it.o.forEach((o,j)=>{const l=document.createElement('label');l.innerHTML='<input type="radio" name="q'+i+'"> '+o;l.firstChild.onchange=()=>{f.className='fb';f.textContent=j===it.c?it.ok:it.no};d.appendChild(l)});d.appendChild(f);qz.appendChild(d)});
+const p=document.createElement('p');p.className='s';p.textContent='Practice only: graded assessment is always marked by lecturers.';qz.appendChild(p);
+document.getElementById('runall').onclick=()=>{const box=document.getElementById('tt');box.innerHTML='';
+ for(const [name,tests] of Object.entries(DATA.sets)){const b=new CampusAssist();let ok=0;const rows=tests.map(([q,exp])=>{const r=b.ask(q);const got=r.type==='escalate'?'ESC':(r.entry||r.type);const good=got===exp;if(good)ok++;return[q,exp,got,r.confidence===undefined?'-':r.confidence,good?'Correct':'WRONG']});
+  const h=document.createElement('p');h.style.fontWeight='600';h.textContent=name+': '+ok+' of '+tests.length+' correct';box.appendChild(h);
+  const t=document.createElement('table');t.style.cssText='border-collapse:collapse;width:100%;font-size:12px;margin-bottom:10px';t.innerHTML='<tr><th>Question</th><th>Expected</th><th>Got</th><th>Conf.</th><th>Result</th></tr>';
+  rows.forEach(r=>{const tr=document.createElement('tr');r.forEach(v=>{const td=document.createElement('td');td.textContent=v;td.style.cssText='border:1px solid var(--bd);padding:4px 6px;vertical-align:top';tr.appendChild(td)});t.appendChild(tr)});box.appendChild(t)}};
+const T=[["t1","p1"],["t2","p2"],["t3","p3"]];
+T.forEach(([b,pn])=>document.getElementById(b).onclick=()=>{T.forEach(([b2,p2])=>{document.getElementById(b2).classList.toggle('on',b2===b);document.getElementById(p2).hidden=p2!==pn})});
+</script></main></body></html>
